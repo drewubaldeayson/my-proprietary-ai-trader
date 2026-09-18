@@ -15,6 +15,7 @@ import {
   Menu,
   Plus,
   Radio,
+  RadioTower,
   Settings,
   ShieldCheck,
   Sparkles,
@@ -45,8 +46,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { BrowserMonitor } from '@/app/browser-monitor';
 
-type View = 'overview' | 'journal' | 'markets' | 'settings';
+type View = 'overview' | 'journal' | 'markets' | 'monitor' | 'settings';
 type Signal = 'WAIT' | 'BUY' | 'SELL' | 'FLATTEN';
 
 type Account = {
@@ -123,6 +125,7 @@ const navItems: { id: View; label: string; icon: typeof LayoutDashboard }[] = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
   { id: 'journal', label: 'Trade journal', icon: ListChecks },
   { id: 'markets', label: 'Markets', icon: BarChart3 },
+  { id: 'monitor', label: 'Browser monitor', icon: RadioTower },
   { id: 'settings', label: 'Accounts', icon: Settings },
 ];
 
@@ -282,6 +285,7 @@ export default function Home() {
   const [trades, setTrades] = useState<Trade[]>([]);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [signal, setSignal] = useState<Signal>('WAIT');
+  const [signalSource, setSignalSource] = useState('Practice mode');
   const [tradeDialogOpen, setTradeDialogOpen] = useState(false);
   const [accountDialogOpen, setAccountDialogOpen] = useState(false);
   const [accountMode, setAccountMode] = useState<'add' | 'edit'>('add');
@@ -441,6 +445,16 @@ export default function Home() {
 
   const previewSignal = (nextSignal: Signal) => {
     setSignal(nextSignal);
+    setSignalSource('Practice alert · interface test only');
+    playSignalSound(nextSignal);
+  };
+
+  const handleMonitorSignal = (
+    nextSignal: Exclude<Signal, 'WAIT'>,
+    detail: string,
+  ) => {
+    setSignal(nextSignal);
+    setSignalSource(`Browser monitor · ${detail}`);
     playSignalSound(nextSignal);
   };
 
@@ -486,7 +500,7 @@ export default function Home() {
   };
 
   const signalTone = signal === 'BUY' ? 'text-emerald-300' : signal === 'SELL' ? 'text-rose-300' : signal === 'FLATTEN' ? 'text-amber-300' : 'text-[#d8d7e7]';
-  const signalCopy = signal === 'BUY' ? 'Practice long alert' : signal === 'SELL' ? 'Practice short alert' : signal === 'FLATTEN' ? 'Practice exit alert' : 'No live market feed connected';
+  const signalCopy = signal === 'WAIT' ? 'No active signal' : signalSource;
 
   return (
     <main className="min-h-screen bg-[#2d2b55] text-white">
@@ -548,9 +562,9 @@ export default function Home() {
 
                 <article className="rounded-3xl border border-white/9 bg-[#201f44] p-5 shadow-[0_28px_80px_rgba(12,10,35,.24)] sm:p-6">
                   <div className="flex items-center justify-between"><div className="flex items-center gap-2 text-sm font-semibold"><Bot className="size-5 text-[#f59342]" /> Signal desk</div><div className="flex items-center gap-2 text-xs text-[#9392a5]"><Switch checked={soundEnabled} onCheckedChange={setSoundEnabled} className="data-checked:bg-[#f59342]" aria-label="Signal sounds" />{soundEnabled ? <Volume2 className="size-4" /> : <VolumeX className="size-4" />}</div></div>
-                  <div className="my-7 text-center"><div className="relative mx-auto grid size-28 place-items-center rounded-full border border-white/10 bg-[#2d2b55] shadow-[0_0_0_12px_rgba(255,255,255,.02)]"><span className={`absolute inset-3 rounded-full border border-current opacity-20 ${signalTone}`} /><Radio className={`absolute size-14 opacity-15 ${signalTone}`} /><span className={`relative text-xl font-black tracking-[.12em] ${signalTone}`}>{signal}</span></div><p className="mt-5 font-medium">{signalCopy}</p><p className="mt-1 text-sm text-[#9392a5]">Alerts below test the sound and interface only.</p></div>
+                  <div className="my-7 text-center"><div className="relative mx-auto grid size-28 place-items-center rounded-full border border-white/10 bg-[#2d2b55] shadow-[0_0_0_12px_rgba(255,255,255,.02)]"><span className={`absolute inset-3 rounded-full border border-current opacity-20 ${signalTone}`} /><Radio className={`absolute size-14 opacity-15 ${signalTone}`} /><span className={`relative text-xl font-black tracking-[.12em] ${signalTone}`}>{signal}</span></div><p className="mt-5 font-medium">{signalCopy}</p><p className="mt-1 text-sm text-[#9392a5]">{signalSource.startsWith('Browser monitor') ? 'Triggered by your authorized local tab monitor.' : 'Alerts below test the sound and interface only.'}</p></div>
                   <div className="grid grid-cols-3 gap-2">{(['BUY', 'SELL', 'FLATTEN'] as Signal[]).map((item) => <button key={item} onClick={() => previewSignal(item)} className={`rounded-xl border px-2 py-2.5 text-xs font-bold transition ${item === 'BUY' ? 'border-emerald-400/20 bg-emerald-400/8 text-emerald-300 hover:bg-emerald-400/15' : item === 'SELL' ? 'border-rose-400/20 bg-rose-400/8 text-rose-300 hover:bg-rose-400/15' : 'border-amber-400/20 bg-amber-400/8 text-amber-300 hover:bg-amber-400/15'}`}>{item}</button>)}</div>
-                  <p className="mt-4 rounded-xl bg-white/[.035] px-3 py-2 text-xs leading-5 text-[#a8a7bc]">A verified market-data connection is required before this panel can issue live signals.</p>
+                  <button onClick={() => setView('monitor')} className="mt-4 w-full rounded-xl bg-white/[.035] px-3 py-2 text-left text-xs leading-5 text-[#a8a7bc] transition hover:bg-white/7 hover:text-white">Connect the Browser Monitor to authorize TradingView and Nexus tabs →</button>
                 </article>
               </section>
 
@@ -596,6 +610,16 @@ export default function Home() {
               <section className="rounded-3xl border border-white/8 bg-[#373565] p-5 sm:p-6"><div className="flex flex-wrap items-center justify-between gap-4"><div><p className="text-sm text-[#f8b56f]">Published Proped instruments</p><h2 className="mt-1 text-2xl font-semibold">Markets you can trade</h2><p className="mt-2 max-w-3xl text-sm leading-6 text-[#aaa9be]">Proped lists the contracts below across stock indices, energy, metals, agriculture, currencies, treasuries, and crypto futures. Availability can vary by data feed and account type.</p></div><div className="rounded-2xl border border-white/8 bg-[#2d2b55] px-4 py-3"><p className="flex items-center gap-2 text-sm font-semibold"><span className={`size-2 rounded-full ${session.tone === 'open' ? 'bg-emerald-400' : 'bg-slate-400'}`} />{session.label}</p><p className="mt-1 text-xs text-[#9392a5]">{session.time}</p></div></div></section>
               <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{markets.map((market, index) => <article key={market.category} className="group rounded-3xl border border-white/8 bg-[#373565] p-5 transition hover:-translate-y-0.5 hover:border-[#e1814c]/35"><div className="flex items-center justify-between"><span className="grid size-10 place-items-center rounded-xl bg-[#2d2b55] text-[#f8b56f]"><BarChart3 className="size-5" /></span><span className="text-xs font-medium text-[#9392a5]">0{index + 1}</span></div><h3 className="mt-5 text-lg font-semibold">{market.category}</h3><p className="mt-3 text-sm leading-7 text-[#b5b4c8]">{market.symbols}</p></article>)}<article className="rounded-3xl border border-dashed border-[#e1814c]/35 bg-[#e1814c]/6 p-5"><Sparkles className="size-5 text-[#f8b56f]" /><h3 className="mt-5 text-lg font-semibold">Micro-first sizing</h3><p className="mt-3 text-sm leading-6 text-[#b5b4c8]">Your 25K plan allows up to 30 micros. Micros can make it easier to size exposure precisely while protecting the $1,000 drawdown buffer.</p></article></section>
             </div>
+          )}
+
+          {view === 'monitor' && (
+            <BrowserMonitor
+              accountName={selectedAccount.name}
+              drawdownBuffer={stats.drawdownBuffer}
+              consistency={stats.consistency}
+              consistencyLimit={selectedAccount.consistencyLimit}
+              onSignal={handleMonitorSignal}
+            />
           )}
 
           {view === 'settings' && (
