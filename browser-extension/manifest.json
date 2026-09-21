@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "EdgePilot Browser Monitor",
-  "version": "1.0.0",
-  "description": "Monitors explicitly selected TradingView and Proped Nexus tabs and relays local signal decisions to EdgePilot.",
+  "version": "1.1.0",
+  "description": "Adds local market-news context, Nexus trade capture, and monitored signal decisions to EdgePilot.",
   "permissions": ["tabs", "storage", "alarms"],
   "host_permissions": [
     "https://*.tradingview.com/*",

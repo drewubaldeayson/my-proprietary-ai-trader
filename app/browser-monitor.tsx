@@ -52,6 +52,9 @@ type MonitorDecision = {
   shouldAlert?: boolean;
   tradingViewFresh?: boolean;
   propedFresh?: boolean;
+  newsFresh?: boolean;
+  market?: string;
+  newsHeadline?: string;
   timestamp?: number;
 };
 
@@ -144,7 +147,10 @@ export function BrowserMonitor({
         if (!next) return;
         setDecision(next);
         if (next.shouldAlert && next.signal !== 'WAIT') {
-          onSignal(next.signal, next.matchedPhrase ?? 'Browser monitor');
+          onSignal(
+            next.signal,
+            next.reason || next.matchedPhrase || 'Browser monitor',
+          );
         }
       }
     };
@@ -203,9 +209,9 @@ export function BrowserMonitor({
                   Monitor TradingView and Nexus together.
                 </h2>
                 <p className="mt-3 max-w-2xl text-sm leading-6 text-[#aaa9be]">
-                  The extension watches only the tabs you choose. It matches your
-                  visible strategy labels, checks the dashboard risk gate, and
-                  sends a buy, sell, or flatten alert back to EdgePilot.
+                  The extension watches only the tabs you choose. It matches
+                  your visible strategy labels, checks the dashboard risk gate,
+                  and sends a buy, sell, or flatten alert back to EdgePilot.
                 </p>
               </div>
               <span
@@ -225,17 +231,20 @@ export function BrowserMonitor({
                 {
                   step: '1',
                   title: 'Install once',
-                  detail: 'Download and load the unpacked extension in Chrome or Edge.',
+                  detail:
+                    'Download and load the unpacked extension in Chrome or Edge.',
                 },
                 {
                   step: '2',
                   title: 'Choose tabs',
-                  detail: 'Explicitly select the TradingView chart and Proped Nexus tabs.',
+                  detail:
+                    'Explicitly select the TradingView chart and Proped Nexus tabs.',
                 },
                 {
                   step: '3',
                   title: 'Arm monitor',
-                  detail: 'Keep both tabs open. EdgePilot alerts only when every gate passes.',
+                  detail:
+                    'Keep both tabs open. EdgePilot alerts only when every gate passes.',
                 },
               ].map((item) => (
                 <div
@@ -304,20 +313,44 @@ export function BrowserMonitor({
             <div className="space-y-2 text-sm">
               <div className="flex items-center justify-between rounded-xl bg-white/[.035] px-3 py-2.5">
                 <span className="text-[#aaa9be]">TradingView feed</span>
-                <span className={decision.tradingViewFresh ? 'text-emerald-300' : 'text-[#9392a5]'}>
+                <span
+                  className={
+                    decision.tradingViewFresh
+                      ? 'text-emerald-300'
+                      : 'text-[#9392a5]'
+                  }
+                >
                   {decision.tradingViewFresh ? 'Live' : 'Waiting'}
                 </span>
               </div>
               <div className="flex items-center justify-between rounded-xl bg-white/[.035] px-3 py-2.5">
                 <span className="text-[#aaa9be]">Nexus guard</span>
-                <span className={decision.propedFresh ? 'text-emerald-300' : 'text-[#9392a5]'}>
+                <span
+                  className={
+                    decision.propedFresh ? 'text-emerald-300' : 'text-[#9392a5]'
+                  }
+                >
                   {decision.propedFresh ? 'Live' : 'Waiting'}
                 </span>
               </div>
               <div className="flex items-center justify-between rounded-xl bg-white/[.035] px-3 py-2.5">
                 <span className="text-[#aaa9be]">Account risk gate</span>
-                <span className={riskAllowed ? 'text-emerald-300' : 'text-rose-300'}>
+                <span
+                  className={riskAllowed ? 'text-emerald-300' : 'text-rose-300'}
+                >
                   {riskAllowed ? 'Pass' : 'Blocked'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between rounded-xl bg-white/[.035] px-3 py-2.5">
+                <span className="text-[#aaa9be]">Market news context</span>
+                <span
+                  className={
+                    decision.newsFresh ? 'text-emerald-300' : 'text-amber-200'
+                  }
+                >
+                  {decision.newsFresh
+                    ? `Fresh${decision.market ? ` · ${decision.market}` : ''}`
+                    : 'Sync recommended'}
                 </span>
               </div>
             </div>
@@ -356,7 +389,8 @@ export function BrowserMonitor({
                 </SelectContent>
               </Select>
               <p className="truncate text-xs text-[#77768d]">
-                {selectedTradingView?.url ?? 'Open TradingView, then refresh tabs.'}
+                {selectedTradingView?.url ??
+                  'Open TradingView, then refresh tabs.'}
               </p>
             </div>
 
@@ -458,7 +492,9 @@ export function BrowserMonitor({
           </div>
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="minimum-buffer">Minimum drawdown buffer ($)</Label>
+              <Label htmlFor="minimum-buffer">
+                Minimum drawdown buffer ($)
+              </Label>
               <Input
                 id="minimum-buffer"
                 type="number"
@@ -494,13 +530,25 @@ export function BrowserMonitor({
           <div className="mt-5 rounded-2xl border border-white/8 bg-[#2d2b55]/70 p-4 text-sm">
             <div className="flex items-center justify-between gap-4">
               <span className="text-[#aaa9be]">Current drawdown buffer</span>
-              <span className={drawdownBuffer >= config.minimumDrawdownBuffer ? 'text-emerald-300' : 'text-rose-300'}>
+              <span
+                className={
+                  drawdownBuffer >= config.minimumDrawdownBuffer
+                    ? 'text-emerald-300'
+                    : 'text-rose-300'
+                }
+              >
                 ${Math.round(drawdownBuffer).toLocaleString()}
               </span>
             </div>
             <div className="mt-3 flex items-center justify-between gap-4">
               <span className="text-[#aaa9be]">Current consistency</span>
-              <span className={consistency <= consistencyLimit ? 'text-emerald-300' : 'text-rose-300'}>
+              <span
+                className={
+                  consistency <= consistencyLimit
+                    ? 'text-emerald-300'
+                    : 'text-rose-300'
+                }
+              >
                 {consistency.toFixed(1)}% / {consistencyLimit}%
               </span>
             </div>
