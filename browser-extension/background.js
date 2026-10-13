@@ -2,8 +2,8 @@ const CONFIG_KEY = 'edgepilotMonitorConfig';
 const ALERT_KEY = 'edgepilotAlertState';
 const NEWS_KEY = 'edgepilotMarketNews';
 const TRADE_CAPTURE_KEY = 'edgepilotTradeCaptures';
-const VERSION = '1.1.0';
-const MARKET_NEWS_URL = 'https://propedcapital.com/nexus/market-news';
+const VERSION = '1.2.0';
+const MARKET_NEWS_URL = 'https://ffn.nexusprop.com/nexus/market-news';
 const snapshots = { tradingview: null, proped: null };
 
 const defaultConfig = {
@@ -191,12 +191,12 @@ async function syncMarketNews() {
     cache: 'no-store',
     credentials: 'include',
   });
-  if (!response.ok) throw new Error(`Proped returned HTTP ${response.status}.`);
+  if (!response.ok) throw new Error(`FFN returned HTTP ${response.status}.`);
   const html = await response.text();
   const items = parseMarketNews(html);
   if (!items.length) {
     throw new Error(
-      'No news cards were found. Open the Proped Market News page once, then retry.',
+      'No news cards were found. Open the FFN Market News page once, then retry.',
     );
   }
   const feed = { items, syncedAt: Date.now(), sourceUrl: MARKET_NEWS_URL };
@@ -450,8 +450,7 @@ async function syncTabActivation(config) {
     url: [
       'https://*.tradingview.com/*',
       'https://tradingview.com/*',
-      'https://propedcapital.com/*',
-      'https://*.propedcapital.com/*',
+      'https://ffn.nexusprop.com/*',
     ],
   });
   for (const tab of tabs) {
@@ -483,7 +482,7 @@ async function listTabs() {
       .filter((tab) => (tab.url || '').includes('tradingview.com'))
       .map(simplify),
     proped: all
-      .filter((tab) => (tab.url || '').includes('propedcapital.com'))
+      .filter((tab) => (tab.url || '').includes('ffn.nexusprop.com'))
       .map(simplify),
     config,
   };

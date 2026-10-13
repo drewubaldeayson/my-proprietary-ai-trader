@@ -31,7 +31,7 @@ export type MarketNewsFeed = {
   sourceUrl: string;
 };
 
-const sourceUrl = 'https://propedcapital.com/nexus/market-news';
+const sourceUrl = 'https://ffn.nexusprop.com/nexus/market-news';
 
 function timeLabel(value: number | null) {
   if (!value) return 'Not synced yet';
@@ -73,15 +73,15 @@ export function MarketNews({
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
                 <p className="text-sm font-medium text-[#f8b56f]">
-                  Proped market intelligence
+                  FFN market intelligence
                 </p>
                 <h2 className="mt-1 text-2xl font-semibold tracking-tight">
                   Market news context
                 </h2>
                 <p className="mt-3 max-w-2xl text-sm leading-6 text-[#aaa9be]">
-                  Sync the latest Proped headlines into the local signal gate.
-                  News can add confirmation or caution, but it never creates a
-                  trade signal on its own.
+                  Sync the latest FFN headlines into the local signal gate. News
+                  can add confirmation or caution, but it never creates a trade
+                  signal on its own.
                 </p>
               </div>
               <Button

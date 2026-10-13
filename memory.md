@@ -4,7 +4,7 @@ Read this file before changing this project in a future session. It records the 
 
 ## Product purpose
 
-EdgePilot is Granger's private prop-trading decision cockpit. It is designed around a Proped Capital Standard Evaluation and helps track account rules, closed trades, evaluation progress, drawdown, consistency, market availability, and audible trading alerts.
+EdgePilot is Granger's private prop-trading decision cockpit. It is designed around a Funded Futures Network MAX Standard 25K evaluation and helps track account rules, closed trades, qualifying-day progress, drawdown, daily loss, consistency, contract scaling, payout readiness, market availability, and audible trading alerts.
 
 This is a decision-support and journaling application. It is not a broker, it does not place orders, and it must not fabricate live AI signals when no verified source is connected.
 
@@ -13,26 +13,32 @@ This is a decision-support and journaling application. It is not a broker, it do
 - Private production URL: https://edgepilot-ai-trader.grangerdeil.chatgpt.site
 - Sites project ID: `appgprj_6aad341fc7088191affc2e2fae11de98`
 - The site is owner-only with custom access for one account. Preserve that access unless Granger explicitly asks to change it.
-- Current published Sites version at the time of this note: version 2.
-- Current Git commit at the time of this note: `e2356c71cf92bcbf5978aa7955ee5c18d72c86ed`
+- Sites versions advance on every publication; query the Sites project rather than relying on a stored version number.
 
 ## Main account defaults
 
-The starter account is **Proped Standard 25K**:
+The starter account is **FFN MAX Standard 25K**:
 
 - Starting balance: $25,000
-- Funding path: Standard Eval
-- Drawdown: $1,000, EOD trailing
-- Profit target: $1,500
+- Funding path: MAX Standard, five days to pass
+- Evaluation profit target: $2,000
+- Drawdown: $1,500, EOD (End of Day)
+- Daily loss limit: $1,000
+- Minimum trading days: 5 days with at least $100 closed profit each
 - Consistency limit: 40%
 - Maximum position: 3 minis or 30 micros
-- Profit share: 80/20
-- Payout schedule: bi-weekly
-- Maximum payout: $1,500
-- Data feed: Nexus Connect
-- Weekend holds: enabled in the saved starter account, but the UI warns that Proped requires the applicable add-on
+- Evaluation reset fee: $100; activation fee: none
+- Data connection: Nexus Connect; selected platform: Onyx
+- Funded profit share: 80%; payout frequency: same day
+- Funded drawdown lock: starting balance + $100 ($25,100)
+- Funded buffer: $1,500; minimum payout: $500
+- Payout cap: $1,000 for payouts 1–3 and $1,200 for payout 4+
+- Funded reset fee: $475 before any payout, once
+- Funded scaling: 1 mini/10 micros at $0–$800 profit; 2/20 at $801–$1,000; 3/30 at $1,001+
+- Promotion review: after 4 payouts on one account or 10 since the prior review; all Sim Funded accounts close on review
+- The FFN add-ons page showed no active add-ons during the October 2026 verification. It offered Rithmic Level 2 and extra Rithmic market-data sessions, neither applicable to the selected Nexus Connect plan.
 
-Proped's public trading-rules page was checked during the original build. It lists stock-index, energy, metals, agriculture, currency, treasury, and crypto futures. The dashboard includes those published symbol groups and warns that availability depends on the data feed, account type, contract calendar, and the user's current agreement.
+The dashboard keeps a futures symbol watchlist as a planning aid. It no longer claims the list is an authoritative FFN market universe; Nexus Connect, Onyx, the contract calendar, and the signed FFN agreement control availability.
 
 ## Design system
 
@@ -54,12 +60,15 @@ The visual direction is a dense but calm risk cockpit. Preserve the existing nav
 - Real-time calculations after each logged trade:
   - current balance and cumulative P&L
   - profit-target progress
-  - projected EOD trailing drawdown floor and remaining buffer
+  - projected EOD trailing drawdown floor from daily closing balances and remaining buffer
+  - closed-P&L daily-loss headroom
+  - five $100+ qualifying-day progress
   - largest winning day and consistency percentage
   - today's closed P&L
   - win rate and closed-trade count
 - Position-limit warning in the trade form
-- Proped market universe and Chicago futures-session indicator
+- Evaluation readiness, funded contract scaling, and payout map
+- Futures watchlist and Chicago futures-session indicator
 - Distinct Web Audio sounds for BUY, SELL, and FLATTEN
 - Practice signal buttons for testing sounds and UI
 - WebMCP tools for reading the selected account summary and logging a closed trade when the browser supports WebMCP
@@ -89,10 +98,10 @@ Behavior:
 
 1. The user installs the unpacked extension manually.
 2. The EdgePilot **Browser monitor** screen detects the extension.
-3. The user explicitly selects one TradingView tab and, normally, one Proped Nexus tab.
+3. The user explicitly selects one TradingView tab and, normally, one FFN Nexus tab at `ffn.nexusprop.com`.
 4. Only the selected source tabs are activated for text monitoring.
 5. The extension matches exact, user-configured TradingView indicator phrases.
-6. BUY or SELL is allowed only when the dashboard risk gate passes and the required Nexus tab is fresh.
+6. BUY or SELL is allowed only when drawdown, daily-loss, and consistency gates pass and the required Nexus tab is fresh.
 7. FLATTEN/exit phrases can alert regardless of entry risk gating.
 8. Repeated sounds are limited by a configurable cooldown.
 9. The extension relays only connection state, the resulting decision, and the matched phrase to the dashboard. Raw tab text stays inside the local extension and is not uploaded.
@@ -120,7 +129,7 @@ Important limitation: this is currently deterministic phrase-and-risk monitoring
 3. Open `chrome://extensions` or `edge://extensions`.
 4. Enable Developer mode.
 5. Choose **Load unpacked** and select the extracted folder.
-6. Refresh EdgePilot, TradingView, and Proped Nexus.
+6. Refresh EdgePilot, TradingView, and FFN Nexus.
 7. Return to Browser Monitor, refresh tabs, select both tabs, enter exact strategy labels, and arm monitoring.
 8. Enable sound once in EdgePilot so browser audio is unlocked.
 
@@ -129,10 +138,10 @@ Important limitation: this is currently deterministic phrase-and-risk monitoring
 - Never claim a live signal is AI-generated without an actual verified model and data source.
 - Never automate order placement without a separate explicit user request, a carefully scoped confirmation design, and appropriate platform authorization.
 - Keep account data and journal data local unless Granger explicitly asks for durable cloud storage.
-- Treat Proped Nexus and the signed account agreement as the authority. Dashboard calculations are projections from manually logged closed trades.
+- Treat FFN Nexus/Onyx and the signed account agreement as the authority. Dashboard calculations are projections from manually logged closed trades and do not include unrealized P&L.
 - Preserve owner-only hosting by default.
 - Do not store browser-tab text, credentials, session cookies, or authentication data.
-- Browser permissions must remain explicit and limited to TradingView, Proped Capital, EdgePilot, and local development.
+- Browser permissions must remain explicit and limited to TradingView, `ffn.nexusprop.com`, EdgePilot, and local development.
 
 ## Development and validation
 

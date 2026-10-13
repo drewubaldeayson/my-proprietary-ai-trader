@@ -83,12 +83,14 @@ const defaultConfig: MonitorConfig = {
 export function BrowserMonitor({
   accountName,
   drawdownBuffer,
+  dailyLossRemaining,
   consistency,
   consistencyLimit,
   onSignal,
 }: {
   accountName: string;
   drawdownBuffer: number;
+  dailyLossRemaining: number;
   consistency: number;
   consistencyLimit: number;
   onSignal: (signal: Exclude<MonitorSignal, 'WAIT'>, detail: string) => void;
@@ -104,6 +106,7 @@ export function BrowserMonitor({
   });
   const riskAllowed =
     drawdownBuffer >= config.minimumDrawdownBuffer &&
+    dailyLossRemaining > 0 &&
     consistency <= consistencyLimit;
 
   useEffect(() => {
@@ -238,7 +241,7 @@ export function BrowserMonitor({
                   step: '2',
                   title: 'Choose tabs',
                   detail:
-                    'Explicitly select the TradingView chart and Proped Nexus tabs.',
+                    'Explicitly select the TradingView chart and FFN Nexus tabs.',
                 },
                 {
                   step: '3',
@@ -395,7 +398,7 @@ export function BrowserMonitor({
             </div>
 
             <div className="space-y-2">
-              <Label>Proped Nexus tab</Label>
+              <Label>FFN Nexus tab</Label>
               <Select
                 value={config.propedTabId}
                 onValueChange={(value) =>
@@ -403,7 +406,7 @@ export function BrowserMonitor({
                 }
               >
                 <SelectTrigger className="h-11 w-full border-white/10 bg-[#2d2b55] text-white">
-                  <SelectValue placeholder="Choose an open Proped Nexus tab" />
+                  <SelectValue placeholder="Choose an open FFN Nexus tab" />
                 </SelectTrigger>
                 <SelectContent className="border-white/10 bg-[#242348] text-white">
                   {propedTabs.map((tab) => (
@@ -538,6 +541,16 @@ export function BrowserMonitor({
                 }
               >
                 ${Math.round(drawdownBuffer).toLocaleString()}
+              </span>
+            </div>
+            <div className="mt-3 flex items-center justify-between gap-4">
+              <span className="text-[#aaa9be]">Daily loss room</span>
+              <span
+                className={
+                  dailyLossRemaining > 0 ? 'text-emerald-300' : 'text-rose-300'
+                }
+              >
+                ${Math.max(0, dailyLossRemaining).toLocaleString()}
               </span>
             </div>
             <div className="mt-3 flex items-center justify-between gap-4">

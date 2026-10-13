@@ -71,16 +71,27 @@ type Account = {
   provider: string;
   startingBalance: number;
   fundingPath: string;
+  stage: 'Evaluation' | 'Funded';
   drawdownAmount: number;
   drawdownModel: string;
   profitTarget: number;
+  dailyLossLimit: number;
+  minTradingDays: number;
+  qualifyingDayMinimum: number;
   consistencyLimit: number;
   maxMinis: number;
   maxMicros: number;
   profitShare: string;
   payoutSchedule: string;
   maxPayout: number;
+  maxPayoutLater: number;
+  minimumPayout: number;
+  drawdownLock: number;
+  buffer: number;
+  resetFee: number;
+  fundedResetFee: number;
   dataFeed: string;
+  platform: string;
   weekendHolds: boolean;
 };
 
@@ -128,21 +139,32 @@ declare global {
 
 const defaultAccount: Account = {
   id: 'proped-standard-25k',
-  name: 'Proped Standard 25K',
-  provider: 'Proped Capital',
+  name: 'FFN MAX Standard 25K',
+  provider: 'Funded Futures Network',
   startingBalance: 25000,
-  fundingPath: 'Standard Eval',
-  drawdownAmount: 1000,
-  drawdownModel: 'EOD trailing',
-  profitTarget: 1500,
+  fundingPath: 'MAX Standard · 5 days to pass',
+  stage: 'Evaluation',
+  drawdownAmount: 1500,
+  drawdownModel: 'EOD (End of Day)',
+  profitTarget: 2000,
+  dailyLossLimit: 1000,
+  minTradingDays: 5,
+  qualifyingDayMinimum: 100,
   consistencyLimit: 40,
   maxMinis: 3,
   maxMicros: 30,
-  profitShare: '80/20',
-  payoutSchedule: 'Bi-Weekly',
-  maxPayout: 1500,
+  profitShare: '80%',
+  payoutSchedule: 'Same day',
+  maxPayout: 1000,
+  maxPayoutLater: 1200,
+  minimumPayout: 500,
+  drawdownLock: 25100,
+  buffer: 1500,
+  resetFee: 100,
+  fundedResetFee: 475,
   dataFeed: 'Nexus Connect',
-  weekendHolds: true,
+  platform: 'Onyx',
+  weekendHolds: false,
 };
 
 const navItems: { id: View; label: string; icon: typeof LayoutDashboard }[] = [
@@ -177,7 +199,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 const emptyNewsFeed: MarketNewsFeed = {
   items: [],
   syncedAt: null,
-  sourceUrl: 'https://propedcapital.com/nexus/market-news',
+  sourceUrl: 'https://ffn.nexusprop.com/nexus/market-news',
 };
 const newId = () =>
   typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -188,28 +210,92 @@ function clamp(value: number, min = 0, max = 100) {
   return Math.min(max, Math.max(min, value));
 }
 
+function normalizeAccount(value: Partial<Account>): Account {
+  const isLegacyStarter =
+    value.id === defaultAccount.id ||
+    (value.provider === 'Proped Capital' && value.startingBalance === 25000);
+
+  if (isLegacyStarter) {
+    return { ...value, ...defaultAccount, id: value.id ?? defaultAccount.id };
+  }
+
+  const drawdownAmount = value.drawdownAmount ?? defaultAccount.drawdownAmount;
+  return {
+    ...defaultAccount,
+    ...value,
+    id: value.id ?? newId(),
+    stage: value.stage ?? 'Evaluation',
+    dailyLossLimit: value.dailyLossLimit ?? drawdownAmount,
+    minTradingDays: value.minTradingDays ?? 0,
+    qualifyingDayMinimum: value.qualifyingDayMinimum ?? 0,
+    maxPayoutLater: value.maxPayoutLater ?? value.maxPayout ?? 0,
+    minimumPayout: value.minimumPayout ?? 0,
+    drawdownLock: value.drawdownLock ?? 0,
+    buffer: value.buffer ?? drawdownAmount,
+    resetFee: value.resetFee ?? 0,
+    fundedResetFee: value.fundedResetFee ?? 0,
+    platform: value.platform ?? value.dataFeed ?? 'Confirm in account portal',
+  };
+}
+
 function buildStats(account: Account, trades: Trade[]) {
   const ordered = [...trades].sort((a, b) => a.date.localeCompare(b.date));
   const profit = ordered.reduce((sum, trade) => sum + trade.pnl, 0);
   const balance = account.startingBalance + profit;
-  let running = account.startingBalance;
-  let peak = running;
-  const curve = [running];
   const daily = new Map<string, number>();
 
   for (const trade of ordered) {
-    running += trade.pnl;
+    daily.set(trade.date, (daily.get(trade.date) ?? 0) + trade.pnl);
+  }
+
+  let running = account.startingBalance;
+  let peak = running;
+  const curve = [running];
+  const dailyResults = [...daily.entries()].sort(([a], [b]) =>
+    a.localeCompare(b),
+  );
+  for (const [, dailyPnl] of dailyResults) {
+    running += dailyPnl;
     peak = Math.max(peak, running);
     curve.push(running);
-    daily.set(trade.date, (daily.get(trade.date) ?? 0) + trade.pnl);
   }
 
   const winningTrades = ordered.filter((trade) => trade.pnl > 0).length;
   const largestDay = Math.max(0, ...daily.values());
   const consistency = profit > 0 ? (largestDay / profit) * 100 : 0;
-  const projectedFloor = peak - account.drawdownAmount;
+  const trailingFloor = peak - account.drawdownAmount;
+  const projectedFloor =
+    account.stage === 'Funded' && account.drawdownLock > 0
+      ? Math.min(trailingFloor, account.drawdownLock)
+      : trailingFloor;
   const drawdownBuffer = balance - projectedFloor;
   const todaysPnl = daily.get(today()) ?? 0;
+  const dailyLossRemaining = Math.max(
+    0,
+    account.dailyLossLimit + Math.min(0, todaysPnl),
+  );
+  const qualifyingDays = dailyResults.filter(
+    ([, dailyPnl]) => dailyPnl >= account.qualifyingDayMinimum,
+  ).length;
+  const dayProgress = account.minTradingDays
+    ? clamp((qualifyingDays / account.minTradingDays) * 100)
+    : 100;
+  const contractCapMinis =
+    account.stage === 'Funded'
+      ? profit <= 800
+        ? 1
+        : profit <= 1000
+          ? 2
+          : account.maxMinis
+      : account.maxMinis;
+  const contractCapMicros = Math.min(account.maxMicros, contractCapMinis * 10);
+  const passReady =
+    account.stage === 'Evaluation' &&
+    profit >= account.profitTarget &&
+    qualifyingDays >= account.minTradingDays &&
+    consistency <= account.consistencyLimit &&
+    drawdownBuffer > 0 &&
+    dailyLossRemaining > 0;
 
   return {
     balance,
@@ -219,8 +305,15 @@ function buildStats(account: Account, trades: Trade[]) {
     projectedFloor,
     drawdownBuffer,
     todaysPnl,
+    dailyLossRemaining,
     consistency,
     largestDay,
+    qualifyingDays,
+    tradingDays: daily.size,
+    dayProgress,
+    contractCapMinis,
+    contractCapMicros,
+    passReady,
     winRate: ordered.length ? (winningTrades / ordered.length) * 100 : 0,
     progress: clamp((profit / account.profitTarget) * 100),
     trades: ordered.length,
@@ -395,7 +488,10 @@ export default function Home() {
         const savedSound = localStorage.getItem('edgepilot.sound');
         const savedQuickTrades = localStorage.getItem('edgepilot.quickTrades');
         const savedNews = localStorage.getItem('edgepilot.marketNews');
-        if (savedAccounts) setAccounts(JSON.parse(savedAccounts));
+        if (savedAccounts) {
+          const parsed = JSON.parse(savedAccounts);
+          if (Array.isArray(parsed)) setAccounts(parsed.map(normalizeAccount));
+        }
         if (savedTrades) setTrades(JSON.parse(savedTrades));
         if (savedSelected) setSelectedAccountId(savedSelected);
         if (savedSound) setSoundEnabled(savedSound === 'true');
@@ -447,7 +543,7 @@ export default function Home() {
         const result = event.data.payload;
         if (!result?.ok || !result.feed) {
           setNewsSyncError(
-            result?.error ?? 'The Proped market-news page could not be synced.',
+            result?.error ?? 'The FFN market-news page could not be synced.',
           );
           return;
         }
@@ -498,7 +594,7 @@ export default function Home() {
           name: 'get_prop_account_summary',
           title: 'Get prop account summary',
           description:
-            'Read the selected account balance, target progress, drawdown buffer, and consistency from the visible EdgePilot dashboard.',
+            'Read the selected account balance, target progress, qualifying days, daily-loss room, drawdown buffer, and consistency from the visible EdgePilot dashboard.',
           inputSchema: {
             type: 'object',
             properties: {},
@@ -510,8 +606,12 @@ export default function Home() {
             balance: stats.balance,
             profit: stats.profit,
             targetProgressPercent: Math.round(stats.progress * 10) / 10,
+            qualifyingDays: stats.qualifyingDays,
+            requiredQualifyingDays: selectedAccount.minTradingDays,
+            dailyLossRemaining: stats.dailyLossRemaining,
             projectedDrawdownBuffer: stats.drawdownBuffer,
             consistencyPercent: Math.round(stats.consistency * 10) / 10,
+            readyToPass: stats.passReady,
           }),
         },
         { signal: lifecycle.signal },
@@ -670,7 +770,7 @@ export default function Home() {
       ...defaultAccount,
       id: newId(),
       name: '',
-      provider: 'Proped Capital',
+      provider: 'Funded Futures Network',
     });
     setAccountDialogOpen(true);
   };
@@ -790,7 +890,7 @@ export default function Home() {
                 onValueChange={(value) => setSelectedAccountId(String(value))}
               >
                 <SelectTrigger className="h-10 max-w-[190px] border-white/10 bg-[#373565] px-3 text-white hover:bg-[#3d3b70]">
-                  <SelectValue />
+                  <span className="truncate">{selectedAccount.name}</span>
                 </SelectTrigger>
                 <SelectContent className="border-white/10 bg-[#242348] text-white">
                   {accounts.map((account) => (
@@ -952,7 +1052,7 @@ export default function Home() {
                 </article>
               </section>
 
-              <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 <StatCard
                   label="Drawdown buffer"
                   value={fmt.format(stats.drawdownBuffer)}
@@ -962,6 +1062,29 @@ export default function Home() {
                     stats.drawdownBuffer < selectedAccount.drawdownAmount * 0.3
                       ? 'warn'
                       : 'good'
+                  }
+                />
+                <StatCard
+                  label="Daily loss room"
+                  value={fmt.format(stats.dailyLossRemaining)}
+                  detail={`${fmt.format(selectedAccount.dailyLossLimit)} limit · closed P&L projection`}
+                  icon={ShieldCheck}
+                  tone={
+                    stats.dailyLossRemaining <
+                    selectedAccount.dailyLossLimit * 0.3
+                      ? 'warn'
+                      : 'good'
+                  }
+                />
+                <StatCard
+                  label="$100+ qualifying days"
+                  value={`${stats.qualifyingDays} / ${selectedAccount.minTradingDays}`}
+                  detail={`${stats.tradingDays} trading day${stats.tradingDays === 1 ? '' : 's'} logged`}
+                  icon={ListChecks}
+                  tone={
+                    stats.qualifyingDays >= selectedAccount.minTradingDays
+                      ? 'good'
+                      : 'neutral'
                   }
                 />
                 <StatCard
@@ -983,9 +1106,9 @@ export default function Home() {
                   tone={stats.todaysPnl >= 0 ? 'good' : 'warn'}
                 />
                 <StatCard
-                  label="Position ceiling"
-                  value={`${selectedAccount.maxMinis} minis`}
-                  detail={`or ${selectedAccount.maxMicros} micros · 1 mini = 10 micros`}
+                  label="Current contract cap"
+                  value={`${stats.contractCapMinis} mini${stats.contractCapMinis === 1 ? '' : 's'}`}
+                  detail={`or ${stats.contractCapMicros} micros · ${selectedAccount.stage}`}
                   icon={Activity}
                 />
               </section>
@@ -1001,8 +1124,10 @@ export default function Home() {
                         Evaluation guardrails
                       </h2>
                     </div>
-                    <span className="rounded-full border border-emerald-300/20 bg-emerald-300/8 px-3 py-1 text-xs font-semibold text-emerald-300">
-                      Account active
+                    <span
+                      className={`rounded-full border px-3 py-1 text-xs font-semibold ${stats.passReady ? 'border-emerald-300/20 bg-emerald-300/8 text-emerald-300' : 'border-amber-300/20 bg-amber-300/8 text-amber-200'}`}
+                    >
+                      {stats.passReady ? 'Ready to pass' : 'In progress'}
                     </span>
                   </div>
                   <div className="mt-6 space-y-5">
@@ -1012,6 +1137,12 @@ export default function Home() {
                         value: `${stats.progress.toFixed(1)}%`,
                         width: stats.progress,
                         note: `${fmt.format(stats.profit)} of ${fmt.format(selectedAccount.profitTarget)}`,
+                      },
+                      {
+                        label: `Complete ${selectedAccount.minTradingDays} qualifying days`,
+                        value: `${stats.qualifyingDays} / ${selectedAccount.minTradingDays}`,
+                        width: stats.dayProgress,
+                        note: `${fmt.format(selectedAccount.qualifyingDayMinimum)}+ closed profit on each counted day`,
                       },
                       {
                         label: 'Stay inside drawdown',
@@ -1061,42 +1192,109 @@ export default function Home() {
                   <div className="flex items-center justify-between gap-4">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[.14em] text-[#f8b56f]">
-                        Tradeable weekdays
+                        MAX Standard 25K
                       </p>
                       <h2 className="mt-1 text-xl font-semibold">
-                        Proped market universe
+                        Today’s rule card
                       </h2>
                     </div>
-                    <Button
-                      variant="ghost"
-                      onClick={() => setView('markets')}
-                      className="text-[#b6b5ca] hover:bg-white/7 hover:text-white"
-                    >
-                      All markets <ChevronRight />
-                    </Button>
+                    <span className="rounded-full bg-white/6 px-3 py-1 text-xs font-semibold text-[#b7b6cb]">
+                      {selectedAccount.stage}
+                    </span>
                   </div>
                   <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                    {markets.slice(0, 4).map((market) => (
+                    {[
+                      [
+                        'Daily loss limit',
+                        fmt.format(selectedAccount.dailyLossLimit),
+                      ],
+                      [
+                        'Qualifying day',
+                        `${fmt.format(selectedAccount.qualifyingDayMinimum)}+`,
+                      ],
+                      ['Reset fee', fmt.format(selectedAccount.resetFee)],
+                      [
+                        'Connection',
+                        `${selectedAccount.dataFeed} · ${selectedAccount.platform}`,
+                      ],
+                    ].map(([label, value]) => (
                       <div
-                        key={market.category}
+                        key={label}
                         className="rounded-2xl border border-white/7 bg-[#2d2b55]/65 p-3.5"
                       >
-                        <p className="text-sm font-semibold">
-                          {market.category}
-                        </p>
-                        <p className="mt-2 text-xs leading-5 text-[#aaa9be]">
-                          {market.symbols}
-                        </p>
+                        <p className="text-xs text-[#9392a5]">{label}</p>
+                        <p className="mt-2 text-sm font-semibold">{value}</p>
                       </div>
                     ))}
                   </div>
                   <p className="mt-4 flex items-start gap-2 text-xs leading-5 text-[#9392a5]">
                     <Clock3 className="mt-0.5 size-4 shrink-0 text-[#f8b56f]" />{' '}
-                    Most listed futures trade nearly 23 hours Sunday evening
-                    through Friday, with a daily maintenance break. Check the
-                    contract calendar and your Nexus account before entry.
+                    Stop before the limit, not at it. This card uses closed
+                    journal P&amp;L; Nexus/Onyx equity and your signed agreement
+                    remain authoritative for intraday and unrealized loss.
                   </p>
                 </article>
+              </section>
+
+              <section className="rounded-3xl border border-white/8 bg-[#201f44] p-5 sm:p-6">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[.14em] text-[#f8b56f]">
+                      After you pass
+                    </p>
+                    <h2 className="mt-1 text-xl font-semibold">
+                      Funded payout and scaling map
+                    </h2>
+                  </div>
+                  <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-[#b7b6cb]">
+                    Same-day payouts · {selectedAccount.profitShare} split
+                  </span>
+                </div>
+                <div className="mt-5 grid gap-3 md:grid-cols-3">
+                  {[
+                    ['1 mini / 10 micros', '$0–$800 profit'],
+                    ['2 minis / 20 micros', '$801–$1,000 profit'],
+                    ['3 minis / 30 micros', '$1,001+ profit'],
+                  ].map(([size, band]) => (
+                    <div
+                      key={size}
+                      className="rounded-2xl border border-white/7 bg-[#2d2b55]/70 p-4"
+                    >
+                      <p className="font-semibold">{size}</p>
+                      <p className="mt-1 text-xs text-[#9392a5]">{band}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-4">
+                  <p className="rounded-xl bg-white/[.035] p-3">
+                    <span className="text-[#9392a5]">Minimum payout</span>
+                    <br />
+                    <strong>{fmt.format(selectedAccount.minimumPayout)}</strong>
+                  </p>
+                  <p className="rounded-xl bg-white/[.035] p-3">
+                    <span className="text-[#9392a5]">Payouts 1–3 cap</span>
+                    <br />
+                    <strong>{fmt.format(selectedAccount.maxPayout)}</strong>
+                  </p>
+                  <p className="rounded-xl bg-white/[.035] p-3">
+                    <span className="text-[#9392a5]">Payout 4+ cap</span>
+                    <br />
+                    <strong>
+                      {fmt.format(selectedAccount.maxPayoutLater)}
+                    </strong>
+                  </p>
+                  <p className="rounded-xl bg-white/[.035] p-3">
+                    <span className="text-[#9392a5]">Funded drawdown lock</span>
+                    <br />
+                    <strong>{fmt.format(selectedAccount.drawdownLock)}</strong>
+                  </p>
+                </div>
+                <p className="mt-4 text-xs leading-5 text-[#9392a5]">
+                  Promotion review follows 4 payouts on one account or 10 since
+                  the last review; all Sim Funded accounts close on review. The
+                  one-time funded reset before any payout is{' '}
+                  {fmt.format(selectedAccount.fundedResetFee)}.
+                </p>
               </section>
             </div>
           )}
@@ -1181,7 +1379,7 @@ export default function Home() {
                               </td>
                               <td className="px-5 py-4">{trade.amount}</td>
                               <td className="px-5 py-4 text-[#9392a5]">
-                                Proped Nexus
+                                FFN Nexus
                               </td>
                             </tr>
                           ))}
@@ -1253,9 +1451,8 @@ export default function Home() {
                         No trades logged yet
                       </h3>
                       <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-[#9392a5]">
-                        After you close a trade in Proped, log its net result
-                        here to update balance, drawdown, consistency, and win
-                        rate.
+                        After you close a trade in FFN, log its net result here
+                        to update balance, drawdown, consistency, and win rate.
                       </p>
                       <Button
                         onClick={() => setTradeDialogOpen(true)}
@@ -1275,17 +1472,15 @@ export default function Home() {
               <section className="rounded-3xl border border-white/8 bg-[#373565] p-5 sm:p-6">
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div>
-                    <p className="text-sm text-[#f8b56f]">
-                      Published Proped instruments
-                    </p>
+                    <p className="text-sm text-[#f8b56f]">Futures watchlist</p>
                     <h2 className="mt-1 text-2xl font-semibold">
                       Markets you can trade
                     </h2>
                     <p className="mt-2 max-w-3xl text-sm leading-6 text-[#aaa9be]">
-                      Proped lists the contracts below across stock indices,
-                      energy, metals, agriculture, currencies, treasuries, and
-                      crypto futures. Availability can vary by data feed and
-                      account type.
+                      Use this symbol list as a planning aid. Confirm every
+                      contract, session, and market-data entitlement in Nexus
+                      Connect, Onyx, and your current FFN agreement before
+                      entry.
                     </p>
                   </div>
                   <div className="rounded-2xl border border-white/8 bg-[#2d2b55] px-4 py-3">
@@ -1331,7 +1526,7 @@ export default function Home() {
                   <p className="mt-3 text-sm leading-6 text-[#b5b4c8]">
                     Your 25K plan allows up to 30 micros. Micros can make it
                     easier to size exposure precisely while protecting the
-                    $1,000 drawdown buffer.
+                    $1,500 drawdown buffer.
                   </p>
                 </article>
               </section>
@@ -1352,6 +1547,7 @@ export default function Home() {
             <BrowserMonitor
               accountName={selectedAccount.name}
               drawdownBuffer={stats.drawdownBuffer}
+              dailyLossRemaining={stats.dailyLossRemaining}
               consistency={stats.consistency}
               consistencyLimit={selectedAccount.consistencyLimit}
               onSignal={handleMonitorSignal}
@@ -1369,7 +1565,7 @@ export default function Home() {
                     Keep every prop account in one cockpit.
                   </h2>
                   <p className="mt-2 text-sm leading-6 text-[#aaa9be]">
-                    Enter the requirements exactly as shown in your account
+                    Enter the requirements exactly as shown in your FFN account
                     agreement or Nexus dashboard.
                   </p>
                 </div>
@@ -1438,6 +1634,20 @@ export default function Home() {
                           <p className="text-[#9392a5]">Consistency</p>
                           <p className="mt-1 font-semibold">
                             {account.consistencyLimit}%
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-[#9392a5]">Daily loss limit</p>
+                          <p className="mt-1 font-semibold">
+                            {fmt.format(account.dailyLossLimit)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-[#9392a5]">Qualifying days</p>
+                          <p className="mt-1 font-semibold">
+                            {accountStats.qualifyingDays} /{' '}
+                            {account.minTradingDays} at{' '}
+                            {fmt.format(account.qualifyingDayMinimum)}+
                           </p>
                         </div>
                         <div>
@@ -1584,11 +1794,11 @@ export default function Home() {
             </div>
             {tradeForm.contracts >
               (tradeForm.sizeType === 'Mini'
-                ? selectedAccount.maxMinis
-                : selectedAccount.maxMicros) && (
+                ? stats.contractCapMinis
+                : stats.contractCapMicros) && (
               <p className="rounded-xl border border-rose-400/20 bg-rose-400/8 px-3 py-2 text-sm text-rose-200">
                 This exceeds the saved {tradeForm.sizeType.toLowerCase()}{' '}
-                position limit for {selectedAccount.name}.
+                position limit for {selectedAccount.name} at its current stage.
               </p>
             )}
             <div className="space-y-2">
@@ -1638,20 +1848,40 @@ export default function Home() {
           <form onSubmit={submitAccount} className="mt-2 space-y-5">
             <div className="grid gap-4 sm:grid-cols-2">
               {[
-                ['Account name', 'name', 'Proped Standard 25K', 'text'],
-                ['Provider', 'provider', 'Proped Capital', 'text'],
+                ['Account name', 'name', 'FFN MAX Standard 25K', 'text'],
+                ['Provider', 'provider', 'Funded Futures Network', 'text'],
                 ['Starting balance', 'startingBalance', '25000', 'number'],
-                ['Funding path', 'fundingPath', 'Standard Eval', 'text'],
-                ['Drawdown amount', 'drawdownAmount', '1000', 'number'],
-                ['Drawdown model', 'drawdownModel', 'EOD trailing', 'text'],
-                ['Profit target', 'profitTarget', '1500', 'number'],
+                [
+                  'Funding path',
+                  'fundingPath',
+                  'MAX Standard · 5 days to pass',
+                  'text',
+                ],
+                ['Drawdown amount', 'drawdownAmount', '1500', 'number'],
+                ['Drawdown model', 'drawdownModel', 'EOD (End of Day)', 'text'],
+                ['Profit target', 'profitTarget', '2000', 'number'],
+                ['Daily loss limit', 'dailyLossLimit', '1000', 'number'],
+                ['Minimum trading days', 'minTradingDays', '5', 'number'],
+                [
+                  'Qualifying day minimum',
+                  'qualifyingDayMinimum',
+                  '100',
+                  'number',
+                ],
                 ['Consistency limit %', 'consistencyLimit', '40', 'number'],
                 ['Max minis', 'maxMinis', '3', 'number'],
                 ['Max micros', 'maxMicros', '30', 'number'],
-                ['Profit share', 'profitShare', '80/20', 'text'],
-                ['Payout schedule', 'payoutSchedule', 'Bi-Weekly', 'text'],
-                ['Max payout', 'maxPayout', '1500', 'number'],
+                ['Profit share', 'profitShare', '80%', 'text'],
+                ['Payout schedule', 'payoutSchedule', 'Same day', 'text'],
+                ['Payout cap (1–3)', 'maxPayout', '1000', 'number'],
+                ['Payout cap (4+)', 'maxPayoutLater', '1200', 'number'],
+                ['Minimum payout', 'minimumPayout', '500', 'number'],
+                ['Drawdown lock balance', 'drawdownLock', '25100', 'number'],
+                ['Funded buffer', 'buffer', '1500', 'number'],
+                ['Evaluation reset fee', 'resetFee', '100', 'number'],
+                ['Funded reset fee', 'fundedResetFee', '475', 'number'],
                 ['Data feed', 'dataFeed', 'Nexus Connect', 'text'],
+                ['Trading platform', 'platform', 'Onyx', 'text'],
               ].map(([label, key, placeholder, type]) => (
                 <div key={key} className="space-y-2">
                   <Label htmlFor={`account-${key}`}>{label}</Label>
@@ -1674,6 +1904,26 @@ export default function Home() {
                   />
                 </div>
               ))}
+            </div>
+            <div className="space-y-2">
+              <Label>Account stage</Label>
+              <Select
+                value={accountForm.stage}
+                onValueChange={(value) =>
+                  setAccountForm({
+                    ...accountForm,
+                    stage: value as Account['stage'],
+                  })
+                }
+              >
+                <SelectTrigger className="h-10 w-full border-white/10 bg-white/5">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="border-white/10 bg-[#242348] text-white">
+                  <SelectItem value="Evaluation">Evaluation</SelectItem>
+                  <SelectItem value="Funded">Funded</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-white/[.035] p-4">
               <div>
@@ -1713,7 +1963,7 @@ export default function Home() {
       <footer className="border-t border-white/6 bg-[#232247] px-5 py-4 text-center text-xs leading-5 text-[#9392a5] lg:ml-[248px]">
         EdgePilot is a planning and journaling tool, not financial advice or a
         broker. Signals shown without a verified live data connection are
-        practice alerts only. Proped’s Nexus dashboard and your signed agreement
+        practice alerts only. FFN’s Nexus dashboard and your signed agreement
         control.
       </footer>
     </main>
