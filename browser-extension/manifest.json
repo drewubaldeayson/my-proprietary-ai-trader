@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "EdgePilot Browser Monitor",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Adds local market-news context, Nexus trade capture, and monitored signal decisions to EdgePilot.",
   "permissions": ["tabs", "storage", "alarms"],
   "host_permissions": [

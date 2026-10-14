@@ -145,10 +145,14 @@ Important limitation: this is currently deterministic phrase-and-risk monitoring
 
 ## FFN Onyx support
 
-Extension v1.4.0 recognizes the FFN Onyx trading surface at
+Extension v1.4.1 recognizes the FFN Onyx trading surface at
 `https://ffn.onyx-trader.com/*` as a signal-source tab. Onyx appears in the
 TradingView / Onyx dropdown, while the FFN Nexus account page remains a
-separate risk-guard selection.
+separate risk-guard selection. The Browser Monitor remains mounted while the
+user navigates between EdgePilot sections, so armed monitoring and dashboard
+signal delivery continue on Overview. Version 1.4.1 also migrates the legacy
+`FLATTEN, EXIT SIGNAL, CLOSE POSITION` default to `FLATTEN SIGNAL, EXIT SIGNAL`
+to prevent permanent Onyx order controls from causing false flatten alerts.
 
 ## Development and validation
 

@@ -1,5 +1,5 @@
 (() => {
-  const VERSION = '1.4.0';
+  const VERSION = '1.4.1';
   const host = window.location.hostname;
   const isDashboard =
     host === 'edgepilot-ai-trader.grangerdeil.chatgpt.site' ||

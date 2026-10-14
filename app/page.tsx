@@ -1603,7 +1603,7 @@ export default function Home() {
             />
           )}
 
-          {view === 'monitor' && (
+          <div className={view === 'monitor' ? '' : 'hidden'}>
             <BrowserMonitor
               accountName={selectedAccount.name}
               drawdownBuffer={stats.drawdownBuffer}
@@ -1612,7 +1612,7 @@ export default function Home() {
               consistencyLimit={selectedAccount.consistencyLimit}
               onSignal={handleMonitorSignal}
             />
-          )}
+          </div>
 
           {view === 'settings' && (
             <div className="space-y-5">

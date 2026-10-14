@@ -2,7 +2,8 @@ const CONFIG_KEY = 'edgepilotMonitorConfig';
 const ALERT_KEY = 'edgepilotAlertState';
 const NEWS_KEY = 'edgepilotMarketNews';
 const TRADE_CAPTURE_KEY = 'edgepilotTradeCaptures';
-const VERSION = '1.4.0';
+const VERSION = '1.4.1';
+const LEGACY_FLATTEN_PHRASES = 'FLATTEN, EXIT SIGNAL, CLOSE POSITION';
 const MARKET_NEWS_URL =
   'https://app.fundedfuturesnetwork.com/nexus/market-news';
 const snapshots = { tradingview: null, proped: null };
@@ -13,7 +14,7 @@ const defaultConfig = {
   propedTabId: null,
   longPhrases: 'STRONG BUY, LONG SETUP',
   shortPhrases: 'STRONG SELL, SHORT SETUP',
-  flattenPhrases: 'FLATTEN, EXIT SIGNAL, CLOSE POSITION',
+  flattenPhrases: 'FLATTEN SIGNAL, EXIT SIGNAL',
   cooldownSeconds: 60,
   requireNexus: true,
   riskAllowed: false,
@@ -262,7 +263,12 @@ function matchingNewsContext(newsContext, market) {
 
 async function getConfig() {
   const stored = await chrome.storage.local.get(CONFIG_KEY);
-  return { ...defaultConfig, ...(stored[CONFIG_KEY] || {}) };
+  const config = { ...defaultConfig, ...(stored[CONFIG_KEY] || {}) };
+  if (config.flattenPhrases === LEGACY_FLATTEN_PHRASES) {
+    config.flattenPhrases = defaultConfig.flattenPhrases;
+    await chrome.storage.local.set({ [CONFIG_KEY]: config });
+  }
+  return config;
 }
 
 async function saveConfig(next) {

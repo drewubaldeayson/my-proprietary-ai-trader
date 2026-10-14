@@ -69,13 +69,15 @@ type ExtensionMessage = {
   };
 };
 
+const legacyFlattenPhrases = 'FLATTEN, EXIT SIGNAL, CLOSE POSITION';
+
 const defaultConfig: MonitorConfig = {
   armed: false,
   tradingViewTabId: '',
   propedTabId: '',
   longPhrases: 'STRONG BUY, LONG SETUP',
   shortPhrases: 'STRONG SELL, SHORT SETUP',
-  flattenPhrases: 'FLATTEN, EXIT SIGNAL, CLOSE POSITION',
+  flattenPhrases: 'FLATTEN SIGNAL, EXIT SIGNAL',
   cooldownSeconds: 60,
   minimumDrawdownBuffer: 300,
   requireNexus: true,
@@ -97,6 +99,7 @@ export function BrowserMonitor({
   onSignal: (signal: Exclude<MonitorSignal, 'WAIT'>, detail: string) => void;
 }) {
   const [config, setConfig] = useState<MonitorConfig>(defaultConfig);
+  const [configLoaded, setConfigLoaded] = useState(false);
   const [extensionConnected, setExtensionConnected] = useState(false);
   const [extensionVersion, setExtensionVersion] = useState('');
   const [tradingViewTabs, setTradingViewTabs] = useState<BrowserTab[]>([]);
@@ -128,10 +131,21 @@ export function BrowserMonitor({
       if (cancelled) return;
       try {
         const saved = localStorage.getItem('edgepilot.monitor');
-        if (saved) setConfig({ ...defaultConfig, ...JSON.parse(saved) });
+        if (saved) {
+          const parsed = JSON.parse(saved) as Partial<MonitorConfig>;
+          setConfig({
+            ...defaultConfig,
+            ...parsed,
+            flattenPhrases:
+              parsed.flattenPhrases === legacyFlattenPhrases
+                ? defaultConfig.flattenPhrases
+                : (parsed.flattenPhrases ?? defaultConfig.flattenPhrases),
+          });
+        }
       } catch {
         // Keep conservative defaults when browser storage is malformed.
       }
+      setConfigLoaded(true);
     });
     return () => {
       cancelled = true;
@@ -139,8 +153,9 @@ export function BrowserMonitor({
   }, []);
 
   useEffect(() => {
+    if (!configLoaded) return;
     localStorage.setItem('edgepilot.monitor', JSON.stringify(config));
-  }, [config]);
+  }, [config, configLoaded]);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent<ExtensionMessage>) => {
