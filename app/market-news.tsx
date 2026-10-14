@@ -31,7 +31,7 @@ export type MarketNewsFeed = {
   sourceUrl: string;
 };
 
-const sourceUrl = 'https://ffn.nexusprop.com/nexus/market-news';
+const sourceUrl = 'https://app.fundedfuturesnetwork.com/nexus/market-news';
 
 function timeLabel(value: number | null) {
   if (!value) return 'Not synced yet';

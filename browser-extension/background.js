@@ -2,8 +2,9 @@ const CONFIG_KEY = 'edgepilotMonitorConfig';
 const ALERT_KEY = 'edgepilotAlertState';
 const NEWS_KEY = 'edgepilotMarketNews';
 const TRADE_CAPTURE_KEY = 'edgepilotTradeCaptures';
-const VERSION = '1.2.0';
-const MARKET_NEWS_URL = 'https://ffn.nexusprop.com/nexus/market-news';
+const VERSION = '1.3.0';
+const MARKET_NEWS_URL =
+  'https://app.fundedfuturesnetwork.com/nexus/market-news';
 const snapshots = { tradingview: null, proped: null };
 
 const defaultConfig = {
@@ -289,6 +290,35 @@ function fresh(snapshot, tabId) {
   );
 }
 
+function isNexusUrl(url) {
+  try {
+    const parsed = new URL(url || '');
+    return (
+      parsed.hostname === 'ffn.nexusprop.com' ||
+      (parsed.hostname === 'app.fundedfuturesnetwork.com' &&
+        parsed.pathname.startsWith('/nexus'))
+    );
+  } catch {
+    return false;
+  }
+}
+
+function nexusRuleBlock(snapshot) {
+  const text = String(snapshot?.text || '').toUpperCase();
+  const statusIndex = text.indexOf('LIVE RULE STATUS');
+  if (statusIndex < 0) return '';
+
+  const status = text.slice(statusIndex, statusIndex + 3000);
+  if (status.includes('ALL RULES WITHIN LIMITS')) return '';
+  if (/ACCOUNT (?:IS )?(?:FAILED|CLOSED|INACTIVE)/.test(status)) {
+    return 'Entry blocked: Nexus reports that the selected account is not active.';
+  }
+  if (/\b(?:FAILED|BREACHED|VIOLATION|OUTSIDE LIMITS)\b/.test(status)) {
+    return 'Entry blocked: Nexus reports a live rule breach or violation.';
+  }
+  return 'Entry blocked: Nexus does not currently confirm that all live rules are within limits.';
+}
+
 async function broadcastDecision(decision) {
   const dashboardTabs = await chrome.tabs.query({
     url: [
@@ -339,6 +369,7 @@ async function evaluate() {
     config.tradingViewTabId,
   );
   const propedFresh = fresh(snapshots.proped, config.propedTabId);
+  const nexusBlock = propedFresh ? nexusRuleBlock(snapshots.proped) : '';
   let decision = {
     signal: 'WAIT',
     reason: config.armed
@@ -349,6 +380,7 @@ async function evaluate() {
     timestamp: Date.now(),
     shouldAlert: false,
     newsFresh: false,
+    nexusRulesOk: !nexusBlock,
   };
 
   if (!config.armed) {
@@ -382,7 +414,9 @@ async function evaluate() {
     decision.reason =
       'Conflicting long and short labels are visible. No entry alert.';
   } else if (longMatch || shortMatch) {
-    if (!config.riskAllowed) {
+    if (nexusBlock) {
+      decision.reason = nexusBlock;
+    } else if (!config.riskAllowed) {
       decision.reason =
         config.riskSummary || 'Entry blocked by the EdgePilot risk gate.';
     } else {
@@ -451,6 +485,7 @@ async function syncTabActivation(config) {
       'https://*.tradingview.com/*',
       'https://tradingview.com/*',
       'https://ffn.nexusprop.com/*',
+      'https://app.fundedfuturesnetwork.com/nexus/*',
     ],
   });
   for (const tab of tabs) {
@@ -481,9 +516,7 @@ async function listTabs() {
     tradingView: all
       .filter((tab) => (tab.url || '').includes('tradingview.com'))
       .map(simplify),
-    proped: all
-      .filter((tab) => (tab.url || '').includes('ffn.nexusprop.com'))
-      .map(simplify),
+    proped: all.filter((tab) => isNexusUrl(tab.url)).map(simplify),
     config,
   };
 }

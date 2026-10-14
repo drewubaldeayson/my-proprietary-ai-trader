@@ -138,30 +138,32 @@ declare global {
 }
 
 const defaultAccount: Account = {
+  // Keep this ID stable so the original seeded 25K account migrates in place
+  // without orphaning its local journal entries.
   id: 'proped-standard-25k',
-  name: 'FFN MAX Standard 25K',
+  name: 'FFN Standard MAX 50K',
   provider: 'Funded Futures Network',
-  startingBalance: 25000,
+  startingBalance: 50000,
   fundingPath: 'MAX Standard · 5 days to pass',
   stage: 'Evaluation',
-  drawdownAmount: 1500,
+  drawdownAmount: 2000,
   drawdownModel: 'EOD (End of Day)',
-  profitTarget: 2000,
-  dailyLossLimit: 1000,
+  profitTarget: 3000,
+  dailyLossLimit: 1250,
   minTradingDays: 5,
-  qualifyingDayMinimum: 100,
+  qualifyingDayMinimum: 150,
   consistencyLimit: 40,
-  maxMinis: 3,
-  maxMicros: 30,
+  maxMinis: 4,
+  maxMicros: 40,
   profitShare: '80%',
   payoutSchedule: 'Same day',
-  maxPayout: 1000,
-  maxPayoutLater: 1200,
+  maxPayout: 1500,
+  maxPayoutLater: 2000,
   minimumPayout: 500,
-  drawdownLock: 25100,
-  buffer: 1500,
+  drawdownLock: 50000,
+  buffer: 2000,
   resetFee: 100,
-  fundedResetFee: 475,
+  fundedResetFee: 625,
   dataFeed: 'Nexus Connect',
   platform: 'Onyx',
   weekendHolds: false,
@@ -199,7 +201,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 const emptyNewsFeed: MarketNewsFeed = {
   items: [],
   syncedAt: null,
-  sourceUrl: 'https://ffn.nexusprop.com/nexus/market-news',
+  sourceUrl: 'https://app.fundedfuturesnetwork.com/nexus/market-news',
 };
 const newId = () =>
   typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -208,6 +210,59 @@ const newId = () =>
 
 function clamp(value: number, min = 0, max = 100) {
   return Math.min(max, Math.max(min, value));
+}
+
+type FundedScalingBand = {
+  maxProfit: number;
+  minis: number;
+  micros: number;
+  range: string;
+};
+
+function getFundedScalingBands(account: Account): FundedScalingBand[] {
+  const plans: Record<number, FundedScalingBand[]> = {
+    25000: [
+      { maxProfit: 800, minis: 1, micros: 10, range: '$0–$800 profit' },
+      { maxProfit: 1000, minis: 2, micros: 20, range: '$801–$1,000 profit' },
+      { maxProfit: Infinity, minis: 3, micros: 30, range: '$1,001+ profit' },
+    ],
+    50000: [
+      { maxProfit: 1000, minis: 2, micros: 20, range: '$0–$1,000 profit' },
+      { maxProfit: 2000, minis: 3, micros: 30, range: '$1,001–$2,000 profit' },
+      { maxProfit: Infinity, minis: 4, micros: 40, range: '$2,001+ profit' },
+    ],
+    100000: [
+      { maxProfit: 3000, minis: 4, micros: 40, range: '$0–$3,000 profit' },
+      { maxProfit: 4500, minis: 6, micros: 60, range: '$3,001–$4,500 profit' },
+      { maxProfit: Infinity, minis: 10, micros: 100, range: '$4,501+ profit' },
+    ],
+    150000: [
+      { maxProfit: 3000, minis: 4, micros: 40, range: '$0–$3,000 profit' },
+      { maxProfit: 4500, minis: 8, micros: 80, range: '$3,001–$4,500 profit' },
+      { maxProfit: Infinity, minis: 15, micros: 150, range: '$4,501+ profit' },
+    ],
+    250000: [
+      { maxProfit: 5000, minis: 6, micros: 60, range: '$0–$5,000 profit' },
+      {
+        maxProfit: 9000,
+        minis: 12,
+        micros: 120,
+        range: '$5,001–$9,000 profit',
+      },
+      { maxProfit: Infinity, minis: 20, micros: 200, range: '$9,001+ profit' },
+    ],
+  };
+
+  return (
+    plans[account.startingBalance] ?? [
+      {
+        maxProfit: Infinity,
+        minis: account.maxMinis,
+        micros: account.maxMicros,
+        range: 'Confirm scaling in FFN Nexus',
+      },
+    ]
+  );
 }
 
 function normalizeAccount(value: Partial<Account>): Account {
@@ -280,15 +335,17 @@ function buildStats(account: Account, trades: Trade[]) {
   const dayProgress = account.minTradingDays
     ? clamp((qualifyingDays / account.minTradingDays) * 100)
     : 100;
+  const fundedBand = getFundedScalingBands(account).find(
+    (band) => profit <= band.maxProfit,
+  );
   const contractCapMinis =
     account.stage === 'Funded'
-      ? profit <= 800
-        ? 1
-        : profit <= 1000
-          ? 2
-          : account.maxMinis
+      ? (fundedBand?.minis ?? account.maxMinis)
       : account.maxMinis;
-  const contractCapMicros = Math.min(account.maxMicros, contractCapMinis * 10);
+  const contractCapMicros =
+    account.stage === 'Funded'
+      ? (fundedBand?.micros ?? account.maxMicros)
+      : account.maxMicros;
   const passReady =
     account.stage === 'Evaluation' &&
     profit >= account.profitTarget &&
@@ -1192,7 +1249,7 @@ export default function Home() {
                   <div className="flex items-center justify-between gap-4">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[.14em] text-[#f8b56f]">
-                        MAX Standard 25K
+                        {selectedAccount.name}
                       </p>
                       <h2 className="mt-1 text-xl font-semibold">
                         Today’s rule card
@@ -1251,17 +1308,18 @@ export default function Home() {
                   </span>
                 </div>
                 <div className="mt-5 grid gap-3 md:grid-cols-3">
-                  {[
-                    ['1 mini / 10 micros', '$0–$800 profit'],
-                    ['2 minis / 20 micros', '$801–$1,000 profit'],
-                    ['3 minis / 30 micros', '$1,001+ profit'],
-                  ].map(([size, band]) => (
+                  {getFundedScalingBands(selectedAccount).map((band) => (
                     <div
-                      key={size}
+                      key={band.range}
                       className="rounded-2xl border border-white/7 bg-[#2d2b55]/70 p-4"
                     >
-                      <p className="font-semibold">{size}</p>
-                      <p className="mt-1 text-xs text-[#9392a5]">{band}</p>
+                      <p className="font-semibold">
+                        {band.minis} mini{band.minis === 1 ? '' : 's'} /{' '}
+                        {band.micros} micros
+                      </p>
+                      <p className="mt-1 text-xs text-[#9392a5]">
+                        {band.range}
+                      </p>
                     </div>
                   ))}
                 </div>
@@ -1524,9 +1582,11 @@ export default function Home() {
                     Micro-first sizing
                   </h3>
                   <p className="mt-3 text-sm leading-6 text-[#b5b4c8]">
-                    Your 25K plan allows up to 30 micros. Micros can make it
-                    easier to size exposure precisely while protecting the
-                    $1,500 drawdown buffer.
+                    Your {fmt.format(selectedAccount.startingBalance)} plan
+                    allows up to {selectedAccount.maxMicros} micros. Micros can
+                    make it easier to size exposure precisely while protecting
+                    the {fmt.format(selectedAccount.drawdownAmount)} drawdown
+                    buffer.
                   </p>
                 </article>
               </section>
@@ -1848,38 +1908,38 @@ export default function Home() {
           <form onSubmit={submitAccount} className="mt-2 space-y-5">
             <div className="grid gap-4 sm:grid-cols-2">
               {[
-                ['Account name', 'name', 'FFN MAX Standard 25K', 'text'],
+                ['Account name', 'name', 'FFN Standard MAX 50K', 'text'],
                 ['Provider', 'provider', 'Funded Futures Network', 'text'],
-                ['Starting balance', 'startingBalance', '25000', 'number'],
+                ['Starting balance', 'startingBalance', '50000', 'number'],
                 [
                   'Funding path',
                   'fundingPath',
                   'MAX Standard · 5 days to pass',
                   'text',
                 ],
-                ['Drawdown amount', 'drawdownAmount', '1500', 'number'],
+                ['Drawdown amount', 'drawdownAmount', '2000', 'number'],
                 ['Drawdown model', 'drawdownModel', 'EOD (End of Day)', 'text'],
-                ['Profit target', 'profitTarget', '2000', 'number'],
-                ['Daily loss limit', 'dailyLossLimit', '1000', 'number'],
+                ['Profit target', 'profitTarget', '3000', 'number'],
+                ['Daily loss limit', 'dailyLossLimit', '1250', 'number'],
                 ['Minimum trading days', 'minTradingDays', '5', 'number'],
                 [
                   'Qualifying day minimum',
                   'qualifyingDayMinimum',
-                  '100',
+                  '150',
                   'number',
                 ],
                 ['Consistency limit %', 'consistencyLimit', '40', 'number'],
-                ['Max minis', 'maxMinis', '3', 'number'],
-                ['Max micros', 'maxMicros', '30', 'number'],
+                ['Max minis', 'maxMinis', '4', 'number'],
+                ['Max micros', 'maxMicros', '40', 'number'],
                 ['Profit share', 'profitShare', '80%', 'text'],
                 ['Payout schedule', 'payoutSchedule', 'Same day', 'text'],
-                ['Payout cap (1–3)', 'maxPayout', '1000', 'number'],
-                ['Payout cap (4+)', 'maxPayoutLater', '1200', 'number'],
+                ['Payout cap (1–3)', 'maxPayout', '1500', 'number'],
+                ['Payout cap (4+)', 'maxPayoutLater', '2000', 'number'],
                 ['Minimum payout', 'minimumPayout', '500', 'number'],
-                ['Drawdown lock balance', 'drawdownLock', '25100', 'number'],
-                ['Funded buffer', 'buffer', '1500', 'number'],
+                ['Drawdown lock balance', 'drawdownLock', '50000', 'number'],
+                ['Funded buffer', 'buffer', '2000', 'number'],
                 ['Evaluation reset fee', 'resetFee', '100', 'number'],
-                ['Funded reset fee', 'fundedResetFee', '475', 'number'],
+                ['Funded reset fee', 'fundedResetFee', '625', 'number'],
                 ['Data feed', 'dataFeed', 'Nexus Connect', 'text'],
                 ['Trading platform', 'platform', 'Onyx', 'text'],
               ].map(([label, key, placeholder, type]) => (

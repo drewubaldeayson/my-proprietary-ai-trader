@@ -53,6 +53,7 @@ type MonitorDecision = {
   tradingViewFresh?: boolean;
   propedFresh?: boolean;
   newsFresh?: boolean;
+  nexusRulesOk?: boolean;
   market?: string;
   newsHeadline?: string;
   timestamp?: number;
@@ -108,6 +109,18 @@ export function BrowserMonitor({
     drawdownBuffer >= config.minimumDrawdownBuffer &&
     dailyLossRemaining > 0 &&
     consistency <= consistencyLimit;
+  const riskBlocks = [
+    drawdownBuffer < config.minimumDrawdownBuffer
+      ? `drawdown buffer $${Math.round(drawdownBuffer)} is below the $${config.minimumDrawdownBuffer} alert floor`
+      : '',
+    dailyLossRemaining <= 0 ? 'daily loss room is exhausted' : '',
+    consistency > consistencyLimit
+      ? `consistency ${consistency.toFixed(1)}% exceeds ${consistencyLimit}%`
+      : '',
+  ].filter(Boolean);
+  const riskSummary = riskAllowed
+    ? `${accountName} is inside the configured entry guardrails.`
+    : `${accountName} blocked: ${riskBlocks.join('; ')}.`;
 
   useEffect(() => {
     let cancelled = false;
@@ -173,14 +186,12 @@ export function BrowserMonitor({
           tradingViewTabId: Number(config.tradingViewTabId) || null,
           propedTabId: Number(config.propedTabId) || null,
           riskAllowed,
-          riskSummary: riskAllowed
-            ? `${accountName} is inside the configured entry guardrails.`
-            : `${accountName} is blocked by the dashboard risk gate.`,
+          riskSummary,
         },
       },
       '*',
     );
-  }, [accountName, config, extensionConnected, riskAllowed]);
+  }, [config, extensionConnected, riskAllowed, riskSummary]);
 
   const refreshTabs = () => {
     window.postMessage({ type: 'EDGEPILOT_DASHBOARD_LIST_TABS' }, '*');
@@ -235,7 +246,7 @@ export function BrowserMonitor({
                   step: '1',
                   title: 'Install once',
                   detail:
-                    'Download and load the unpacked extension in Chrome or Edge.',
+                    'Download and load the unpacked extension in Brave, Chrome, or Edge.',
                 },
                 {
                   step: '2',
@@ -333,7 +344,11 @@ export function BrowserMonitor({
                     decision.propedFresh ? 'text-emerald-300' : 'text-[#9392a5]'
                   }
                 >
-                  {decision.propedFresh ? 'Live' : 'Waiting'}
+                  {decision.propedFresh
+                    ? decision.nexusRulesOk === false
+                      ? 'Rule block'
+                      : 'Live'
+                    : 'Waiting'}
                 </span>
               </div>
               <div className="flex items-center justify-between rounded-xl bg-white/[.035] px-3 py-2.5">
@@ -418,6 +433,10 @@ export function BrowserMonitor({
               </Select>
               <p className="truncate text-xs text-[#77768d]">
                 {selectedProped?.url ?? 'Log in to Nexus, then refresh tabs.'}
+              </p>
+              <p className="text-xs leading-5 text-[#77768d]">
+                Supports the current app.fundedfuturesnetwork.com portal and the
+                legacy Nexus host.
               </p>
             </div>
 

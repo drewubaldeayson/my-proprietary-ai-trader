@@ -4,7 +4,7 @@ Read this file before changing this project in a future session. It records the 
 
 ## Product purpose
 
-EdgePilot is Granger's private prop-trading decision cockpit. It is designed around a Funded Futures Network MAX Standard 25K evaluation and helps track account rules, closed trades, qualifying-day progress, drawdown, daily loss, consistency, contract scaling, payout readiness, market availability, and audible trading alerts.
+EdgePilot is Granger's private prop-trading decision cockpit. It is designed around a Funded Futures Network Standard MAX 50K evaluation and helps track account rules, closed trades, qualifying-day progress, drawdown, daily loss, consistency, contract scaling, payout readiness, market availability, and audible trading alerts.
 
 This is a decision-support and journaling application. It is not a broker, it does not place orders, and it must not fabricate live AI signals when no verified source is connected.
 
@@ -17,24 +17,24 @@ This is a decision-support and journaling application. It is not a broker, it do
 
 ## Main account defaults
 
-The starter account is **FFN MAX Standard 25K**:
+The starter account is **FFN Standard MAX 50K**:
 
-- Starting balance: $25,000
+- Starting balance: $50,000
 - Funding path: MAX Standard, five days to pass
-- Evaluation profit target: $2,000
-- Drawdown: $1,500, EOD (End of Day)
-- Daily loss limit: $1,000
-- Minimum trading days: 5 days with at least $100 closed profit each
+- Evaluation profit target: $3,000
+- Drawdown: $2,000, EOD (End of Day)
+- Daily loss limit: $1,250 soft breach; session lockout rather than account failure
+- Minimum trading days: 5 winning days with at least $150 net profit at the session close
 - Consistency limit: 40%
-- Maximum position: 3 minis or 30 micros
+- Maximum position: 4 minis or 40 micros
 - Evaluation reset fee: $100; activation fee: none
 - Data connection: Nexus Connect; selected platform: Onyx
 - Funded profit share: 80%; payout frequency: same day
-- Funded drawdown lock: starting balance + $100 ($25,100)
-- Funded buffer: $1,500; minimum payout: $500
-- Payout cap: $1,000 for payouts 1–3 and $1,200 for payout 4+
-- Funded reset fee: $475 before any payout, once
-- Funded scaling: 1 mini/10 micros at $0–$800 profit; 2/20 at $801–$1,000; 3/30 at $1,001+
+- Funded drawdown lock: original account size ($50,000) after the $2,000 buffer is built
+- Funded buffer: $2,000; minimum payout: $500 above the buffer
+- Payout cap: $1,500 for payouts 1–3 and $2,000 for payout 4+
+- Funded reset fee: $625 before any payout, once
+- Funded scaling: 2 minis/20 micros at $0–$1,000 profit; 3/30 at $1,001–$2,000; 4/40 at $2,001+
 - Promotion review: after 4 payouts on one account or 10 since the prior review; all Sim Funded accounts close on review
 - The FFN add-ons page showed no active add-ons during the October 2026 verification. It offered Rithmic Level 2 and extra Rithmic market-data sessions, neither applicable to the selected Nexus Connect plan.
 
@@ -62,7 +62,7 @@ The visual direction is a dense but calm risk cockpit. Preserve the existing nav
   - profit-target progress
   - projected EOD trailing drawdown floor from daily closing balances and remaining buffer
   - closed-P&L daily-loss headroom
-  - five $100+ qualifying-day progress
+  - five $150+ winning-day progress
   - largest winning day and consistency percentage
   - today's closed P&L
   - win rate and closed-trade count
@@ -84,7 +84,7 @@ Primary files:
 
 ## Browser Monitor companion
 
-The Browser Monitor was added because a normal hosted web page cannot read another tab. It is a Manifest V3 extension compatible with Chrome and Edge.
+The Browser Monitor was added because a normal hosted web page cannot read another tab. It is a Manifest V3 extension compatible with Brave, Chrome, and Edge.
 
 Source files:
 
@@ -98,10 +98,10 @@ Behavior:
 
 1. The user installs the unpacked extension manually.
 2. The EdgePilot **Browser monitor** screen detects the extension.
-3. The user explicitly selects one TradingView tab and, normally, one FFN Nexus tab at `ffn.nexusprop.com`.
+3. The user explicitly selects one TradingView tab and, normally, one FFN Nexus tab at `app.fundedfuturesnetwork.com/nexus` (the legacy `ffn.nexusprop.com` host remains supported).
 4. Only the selected source tabs are activated for text monitoring.
 5. The extension matches exact, user-configured TradingView indicator phrases.
-6. BUY or SELL is allowed only when drawdown, daily-loss, and consistency gates pass and the required Nexus tab is fresh.
+6. BUY or SELL is allowed only when drawdown, daily-loss, and consistency gates pass, the required Nexus tab is fresh, and any visible Nexus live-rule status does not report a block or violation.
 7. FLATTEN/exit phrases can alert regardless of entry risk gating.
 8. Repeated sounds are limited by a configurable cooldown.
 9. The extension relays only connection state, the resulting decision, and the matched phrase to the dashboard. Raw tab text stays inside the local extension and is not uploaded.
@@ -126,7 +126,7 @@ Important limitation: this is currently deterministic phrase-and-risk monitoring
 
 1. Open EdgePilot and select **Browser monitor**.
 2. Download and extract `edgepilot-browser-monitor.zip`.
-3. Open `chrome://extensions` or `edge://extensions`.
+3. Open `brave://extensions`, `chrome://extensions`, or `edge://extensions`.
 4. Enable Developer mode.
 5. Choose **Load unpacked** and select the extracted folder.
 6. Refresh EdgePilot, TradingView, and FFN Nexus.
@@ -141,7 +141,7 @@ Important limitation: this is currently deterministic phrase-and-risk monitoring
 - Treat FFN Nexus/Onyx and the signed account agreement as the authority. Dashboard calculations are projections from manually logged closed trades and do not include unrealized P&L.
 - Preserve owner-only hosting by default.
 - Do not store browser-tab text, credentials, session cookies, or authentication data.
-- Browser permissions must remain explicit and limited to TradingView, `ffn.nexusprop.com`, EdgePilot, and local development.
+- Browser permissions must remain explicit and limited to TradingView, the current `app.fundedfuturesnetwork.com` portal, the legacy `ffn.nexusprop.com` portal, EdgePilot, and local development.
 
 ## Development and validation
 
@@ -191,3 +191,5 @@ This is an existing private Sites project. For future releases:
 - Trade editing/deletion with confirmation and an audit history
 
 Do not implement these automatically; they require a new user request and, for model/tab-data transmission, explicit consent and a secure credential path.
+
+codex resume 01a1377e-ad06-74e3-9f46-b5cdc18ae3a1
