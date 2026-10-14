@@ -129,8 +129,8 @@ Important limitation: this is currently deterministic phrase-and-risk monitoring
 3. Open `brave://extensions`, `chrome://extensions`, or `edge://extensions`.
 4. Enable Developer mode.
 5. Choose **Load unpacked** and select the extracted folder.
-6. Refresh EdgePilot, TradingView, and FFN Nexus.
-7. Return to Browser Monitor, refresh tabs, select both tabs, enter exact strategy labels, and arm monitoring.
+6. Refresh EdgePilot, the TradingView or FFN Onyx signal tab, and FFN Nexus.
+7. Return to Browser Monitor, refresh tabs, select the Onyx/TradingView signal tab and Nexus tab, enter exact strategy labels, and arm monitoring.
 8. Enable sound once in EdgePilot so browser audio is unlocked.
 
 ## Safety and product rules
@@ -141,7 +141,14 @@ Important limitation: this is currently deterministic phrase-and-risk monitoring
 - Treat FFN Nexus/Onyx and the signed account agreement as the authority. Dashboard calculations are projections from manually logged closed trades and do not include unrealized P&L.
 - Preserve owner-only hosting by default.
 - Do not store browser-tab text, credentials, session cookies, or authentication data.
-- Browser permissions must remain explicit and limited to TradingView, the current `app.fundedfuturesnetwork.com` portal, the legacy `ffn.nexusprop.com` portal, EdgePilot, and local development.
+- Browser permissions must remain explicit and limited to TradingView, FFN Onyx at `*.onyx-trader.com`, the current `app.fundedfuturesnetwork.com` portal, the legacy `ffn.nexusprop.com` portal, EdgePilot, and local development.
+
+## FFN Onyx support
+
+Extension v1.4.0 recognizes the FFN Onyx trading surface at
+`https://ffn.onyx-trader.com/*` as a signal-source tab. Onyx appears in the
+TradingView / Onyx dropdown, while the FFN Nexus account page remains a
+separate risk-guard selection.
 
 ## Development and validation
 

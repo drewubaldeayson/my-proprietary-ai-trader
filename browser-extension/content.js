@@ -1,5 +1,5 @@
 (() => {
-  const VERSION = '1.3.0';
+  const VERSION = '1.4.0';
   const host = window.location.hostname;
   const isDashboard =
     host === 'edgepilot-ai-trader.grangerdeil.chatgpt.site' ||
@@ -78,7 +78,10 @@
     return;
   }
 
-  const source = host.includes('tradingview.com') ? 'tradingview' : 'proped';
+  const source =
+    host.includes('tradingview.com') || host.endsWith('onyx-trader.com')
+      ? 'tradingview'
+      : 'proped';
   let timer;
   let observer;
   let active = false;

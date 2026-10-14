@@ -2,7 +2,7 @@ const CONFIG_KEY = 'edgepilotMonitorConfig';
 const ALERT_KEY = 'edgepilotAlertState';
 const NEWS_KEY = 'edgepilotMarketNews';
 const TRADE_CAPTURE_KEY = 'edgepilotTradeCaptures';
-const VERSION = '1.3.0';
+const VERSION = '1.4.0';
 const MARKET_NEWS_URL =
   'https://app.fundedfuturesnetwork.com/nexus/market-news';
 const snapshots = { tradingview: null, proped: null };
@@ -303,6 +303,20 @@ function isNexusUrl(url) {
   }
 }
 
+function isSignalSourceUrl(url) {
+  try {
+    const parsed = new URL(url || '');
+    return (
+      parsed.hostname === 'tradingview.com' ||
+      parsed.hostname.endsWith('.tradingview.com') ||
+      parsed.hostname === 'onyx-trader.com' ||
+      parsed.hostname.endsWith('.onyx-trader.com')
+    );
+  } catch {
+    return false;
+  }
+}
+
 function nexusRuleBlock(snapshot) {
   const text = String(snapshot?.text || '').toUpperCase();
   const statusIndex = text.indexOf('LIVE RULE STATUS');
@@ -484,14 +498,15 @@ async function syncTabActivation(config) {
     url: [
       'https://*.tradingview.com/*',
       'https://tradingview.com/*',
+      'https://*.onyx-trader.com/*',
       'https://ffn.nexusprop.com/*',
       'https://app.fundedfuturesnetwork.com/nexus/*',
     ],
   });
   for (const tab of tabs) {
     if (!tab.id) continue;
-    const isTradingView = (tab.url || '').includes('tradingview.com');
-    const selectedId = isTradingView
+    const isSignalSource = isSignalSourceUrl(tab.url);
+    const selectedId = isSignalSource
       ? config.tradingViewTabId
       : config.propedTabId;
     chrome.tabs
@@ -513,9 +528,7 @@ async function listTabs() {
   });
   return {
     version: VERSION,
-    tradingView: all
-      .filter((tab) => (tab.url || '').includes('tradingview.com'))
-      .map(simplify),
+    tradingView: all.filter((tab) => isSignalSourceUrl(tab.url)).map(simplify),
     proped: all.filter((tab) => isNexusUrl(tab.url)).map(simplify),
     config,
   };

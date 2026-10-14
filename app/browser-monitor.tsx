@@ -388,7 +388,7 @@ export function BrowserMonitor({
 
           <div className="mt-5 space-y-4">
             <div className="space-y-2">
-              <Label>TradingView chart tab</Label>
+              <Label>TradingView / Onyx signal tab</Label>
               <Select
                 value={config.tradingViewTabId}
                 onValueChange={(value) =>
@@ -396,7 +396,7 @@ export function BrowserMonitor({
                 }
               >
                 <SelectTrigger className="h-11 w-full border-white/10 bg-[#2d2b55] text-white">
-                  <SelectValue placeholder="Choose an open TradingView tab" />
+                  <SelectValue placeholder="Choose TradingView or your FFN Onyx tab" />
                 </SelectTrigger>
                 <SelectContent className="border-white/10 bg-[#242348] text-white">
                   {tradingViewTabs.map((tab) => (
@@ -408,7 +408,11 @@ export function BrowserMonitor({
               </Select>
               <p className="truncate text-xs text-[#77768d]">
                 {selectedTradingView?.url ??
-                  'Open TradingView, then refresh tabs.'}
+                  'Open TradingView or FFN Onyx, then refresh tabs.'}
+              </p>
+              <p className="text-xs leading-5 text-[#77768d]">
+                FFN Onyx tabs at ffn.onyx-trader.com are supported directly.
+                Select Nexus separately below for the account guard.
               </p>
             </div>
 
